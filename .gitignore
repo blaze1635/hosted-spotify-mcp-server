@@ -173,3 +173,6 @@ cython_debug/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Temporary files
+temp_quickbooks_server.py

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Hosted Spotify MCP Server for Cloudflare Workers
-Multi-user version with HTTP transport
+Hosted Spotify MCP Server
+Multi-environment version with configurable transport
 """
 
 import os
@@ -9,11 +9,20 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from fastmcp import FastMCP
 from dotenv import load_dotenv
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
+# Load environment variables
 load_dotenv()
 
-# Create MCP server for HTTP transport
-mcp = FastMCP("HostedSpotifyServer")
+# Create the MCP server with environment-specific name
+environment = os.getenv('ENVIRONMENT', 'dev')
+transport = os.getenv('TRANSPORT', 'stdio') 
+deployment = os.getenv('DEPLOYMENT', 'ngrok')
+
+# Build server name from components
+server_name = f"Spotify MCP Server ({environment} {transport} {deployment})"
+mcp = FastMCP(server_name)
 
 def get_spotify_client():
     """Get authenticated Spotify client - will need multi-user support later"""
@@ -125,35 +134,88 @@ def get_spotify_status() -> dict:
             "connected": True,
             "user": user['display_name'],
             "user_id": user['id'],
-            "server": "HostedSpotifyServer",
+            "server": server_name,
             "version": "1.0.0"
         }
     except Exception as e:
         return {
             "connected": False,
             "error": str(e),
-            "server": "HostedSpotifyServer",
+            "server": server_name,
             "version": "1.0.0"
         }
 
-# HTTP server instead of stdio
-# HTTP server instead of stdio
-if __name__ == "__main__":
-    print("🎵 Starting Hosted Spotify MCP Server...")
-    print("Available tools: search_tracks, get_current_track, get_user_playlists, create_playlist, add_tracks_to_playlist")
-    print("Available resources: spotify://status")
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request: Request) -> JSONResponse:
+    """Health check endpoint for monitoring server status"""
+    import time
     
-    # Run as HTTP server - try different FastMCP methods
+    # Basic health info
+    health_data = {
+        "status": "healthy",
+        "service": "Spotify MCP Server",
+        "timestamp": time.time(),
+        "environment": os.getenv('ENVIRONMENT', 'dev'),
+        "transport": os.getenv('TRANSPORT', 'stdio')
+    }
+    
+    # Try to check Spotify connection
     try:
-        # Method 1: Try direct HTTP run
-        mcp.run(transport="sse", host="0.0.0.0", port=8000)
+        sp = get_spotify_client()
+        user = sp.current_user()
+        health_data["spotify_connected"] = True
+        health_data["spotify_user"] = user['display_name']
     except Exception as e:
-        print(f"Method 1 failed: {e}")
-        try:
-            # Method 2: Try with different syntax
-            mcp.run_sse(host="0.0.0.0", port=8000)
-        except Exception as e:
-            print(f"Method 2 failed: {e}")
-            # Method 3: Fall back to stdio for now
-            print("Falling back to stdio transport for testing...")
-            mcp.run()
+        health_data["spotify_connected"] = False
+        health_data["spotify_error"] = str(e)
+    
+    return JSONResponse(health_data)
+
+def get_transport_config():
+    """Determine transport configuration based on TRANSPORT variable"""
+    transport = os.getenv('TRANSPORT', 'stdio').lower()
+    environment = os.getenv('ENVIRONMENT', 'dev')
+    
+    if transport == 'http':
+        # HTTP transport for web deployment or local HTTP testing
+        port = int(os.getenv('PORT', 8000))
+        host = os.getenv('HOST', '0.0.0.0')
+        path = os.getenv('MCP_PATH', '/mcp')
+        deployment = os.getenv('DEPLOYMENT', 'ngrok')
+        
+        print(f"🎵 Starting Spotify MCP Server in HTTP mode")
+        print(f"   Environment: {environment}")
+        print(f"   Transport: HTTP")
+        print(f"   Deployment: {deployment}")
+        print(f"   Host: {host}")
+        print(f"   Port: {port}")
+        print(f"   Path: {path}")
+        print("   Available tools: search_tracks, get_current_track, get_user_playlists, create_playlist, add_tracks_to_playlist")
+        print("   Available resources: spotify://status")
+        print("   Health check: /health")
+        
+        return {
+            'transport': 'sse',  # Using SSE transport for HTTP mode
+            'host': host,
+            'port': port
+        }
+    else:
+        # STDIO transport for local development
+        deployment = os.getenv('DEPLOYMENT', 'local')
+        print(f"🎵 Starting Spotify MCP Server in STDIO mode")
+        print(f"   Environment: {environment}")
+        print(f"   Transport: STDIO")
+        print(f"   Deployment: {deployment}")
+        print("   Available tools: search_tracks, get_current_track, get_user_playlists, create_playlist, add_tracks_to_playlist")
+        print("   Available resources: spotify://status")
+        
+        return {
+            'transport': 'stdio'
+        }
+
+if __name__ == "__main__":
+    # Get transport configuration based on environment
+    config = get_transport_config()
+    
+    # Start the MCP server with appropriate transport
+    mcp.run(**config)
