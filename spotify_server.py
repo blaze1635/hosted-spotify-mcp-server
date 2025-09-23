@@ -195,9 +195,10 @@ def get_transport_config():
         print("   Health check: /health")
         
         return {
-            'transport': 'sse',  # Using SSE transport for HTTP mode
+            'transport': 'http',  # Using HTTP transport like QuickBooks server
             'host': host,
-            'port': port
+            'port': port,
+            'path': path
         }
     else:
         # STDIO transport for local development
