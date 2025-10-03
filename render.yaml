@@ -1,15 +1,24 @@
-# Render Deployment Configuration
+# Render Deployment Configuration for Multi-User Spotify MCP Server
 # This file can be used with Render's Infrastructure as Code feature
 
 services:
+  # PostgreSQL Database
+  - type: pserv
+    name: spotify-mcp-db
+    runtime: postgresql
+    plan: free
+    ipAllowList: []
+
+  # Web Service
   - type: web
     name: hosted-spotify-mcp-server
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python spotify_server.py
+    startCommand: python spotify_server_multiuser.py
+    healthCheckPath: /health
     envVars:
       - key: ENVIRONMENT
-        value: dev
+        value: prod
       - key: TRANSPORT
         value: http
       - key: DEPLOYMENT
@@ -23,10 +32,25 @@ services:
         value: 0.0.0.0
       - key: MCP_PATH
         value: /mcp
-      # Spotify credentials (set these in Render dashboard)
+      - key: BASE_URL
+        value: https://hosted-spotify-mcp-server.onrender.com
+
+      # Database Configuration
+      - key: DATABASE_URL
+        fromDatabase:
+          name: spotify-mcp-db
+          property: connectionString
+
+      # Security Keys (generate these securely)
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false # Set manually in dashboard - use: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+      - key: SESSION_SECRET_KEY
+        sync: false # Set manually in dashboard
+
+      # Spotify App Credentials (set these in Render dashboard)
       - key: SPOTIFY_CLIENT_ID
         sync: false # Set manually in dashboard
       - key: SPOTIFY_CLIENT_SECRET
         sync: false # Set manually in dashboard
       - key: SPOTIFY_REDIRECT_URI
-        sync: false # Set manually in dashboard
+        value: https://hosted-spotify-mcp-server.onrender.com/auth/callback

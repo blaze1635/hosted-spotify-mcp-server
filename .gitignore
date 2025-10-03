@@ -128,6 +128,13 @@ ENV/
 env.bak/
 venv.bak/
 
+# Spotify MCP Server specific
+*.db
+*.cache
+.cache
+spotify_users.db
+spotify_tokens.db
+
 # Spyder project settings
 .spyderproject
 .spyproject
