@@ -25,7 +25,8 @@ from middleware import MCPAuthMiddleware, get_user_context
 from web_auth import auth_routes
 from spotify_tools import (
     search_tracks_impl, get_current_track_impl, get_user_playlists_impl,
-    create_playlist_impl, add_tracks_to_playlist_impl, get_spotify_status_impl
+    create_playlist_impl, add_tracks_to_playlist_impl, get_liked_songs_impl,
+    get_playlist_tracks_impl, get_spotify_status_impl
 )
 from auth import cleanup_expired_sessions
 
@@ -206,6 +207,18 @@ def add_tracks_to_playlist(playlist_id: str, track_uris: list) -> str:
     # Get user context from current request for multi-user support
     user_context = get_user_from_request()
     return add_tracks_to_playlist_impl(playlist_id, track_uris, user_context)
+
+@mcp.tool
+def get_liked_songs(limit: int = 20, offset: int = 0) -> str:
+    """Get the user's Liked Songs (saved tracks). Use offset to paginate through results."""
+    user_context = get_user_from_request()
+    return get_liked_songs_impl(limit, offset, user_context)
+
+@mcp.tool
+def get_playlist_tracks(playlist_id: str, limit: int = 20, offset: int = 0) -> str:
+    """Get tracks from a specific playlist. Use get_user_playlists first to find playlist IDs."""
+    user_context = get_user_from_request()
+    return get_playlist_tracks_impl(playlist_id, limit, offset, user_context)
 
 @mcp.resource("spotify://status")
 def get_spotify_status() -> dict:

@@ -136,6 +136,57 @@ def add_tracks_to_playlist_impl(playlist_id: str, track_uris: list, user_context
     except Exception as e:
         return f"Error adding tracks to playlist: {str(e)}"
 
+def get_liked_songs_impl(limit: int = 20, offset: int = 0, user_context: Dict[str, Any] = None) -> str:
+    """Get the user's Liked Songs (saved tracks)"""
+    try:
+        sp = get_user_spotify_client_for_tool(user_context)
+        results = sp.current_user_saved_tracks(limit=limit, offset=offset)
+
+        if not results['items']:
+            user_name = user_context.get('user', {}).get('display_name', 'User')
+            return f"No liked songs found for {user_name}"
+
+        tracks = []
+        for item in results['items']:
+            track = item['track']
+            artists = ', '.join([artist['name'] for artist in track['artists']])
+            added_at = item.get('added_at', '')[:10]  # Just the date
+            tracks.append(f"🎵 {track['name']} by {artists} (added {added_at}) (URI: {track['uri']})")
+
+        total = results['total']
+        user_name = user_context.get('user', {}).get('display_name', 'User')
+        header = f"Liked Songs for {user_name} (showing {offset+1}-{offset+len(tracks)} of {total}):\n"
+        return header + "\n".join(tracks)
+
+    except Exception as e:
+        return f"Error getting liked songs: {str(e)}"
+
+def get_playlist_tracks_impl(playlist_id: str, limit: int = 20, offset: int = 0, user_context: Dict[str, Any] = None) -> str:
+    """Get tracks from a specific playlist"""
+    try:
+        sp = get_user_spotify_client_for_tool(user_context)
+        results = sp.playlist_tracks(playlist_id, limit=limit, offset=offset)
+
+        if not results['items']:
+            return f"No tracks found in playlist {playlist_id}"
+
+        tracks = []
+        for item in results['items']:
+            track = item.get('track')
+            if not track:
+                continue
+            artists = ', '.join([artist['name'] for artist in track['artists']])
+            added_at = item.get('added_at', '')[:10]
+            tracks.append(f"🎵 {track['name']} by {artists} (added {added_at}) (URI: {track['uri']})")
+
+        total = results['total']
+        user_name = user_context.get('user', {}).get('display_name', 'User')
+        header = f"Playlist tracks for {user_name} (showing {offset+1}-{offset+len(tracks)} of {total}):\n"
+        return header + "\n".join(tracks)
+
+    except Exception as e:
+        return f"Error getting playlist tracks: {str(e)}"
+
 def get_spotify_status_impl(user_context: Dict[str, Any] = None) -> dict:
     """Get current Spotify connection status for the user"""
     try:
